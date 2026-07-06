@@ -94,17 +94,17 @@
       font-size: clamp(18px, 2.4vw, 30px);
       font-weight: 900;
       line-height: 1.2;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: pre-line;
+      overflow: visible;
+      text-overflow: clip;
     }
 
     .topic {
       font-size: clamp(13px, 1.6vw, 18px);
       opacity: 0.9;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: pre-line;
+      overflow: visible;
+      text-overflow: clip;
     }
 
     .pill {
@@ -379,6 +379,7 @@
       font-size: clamp(30px, 5vw, 56px);
       line-height: 1.1;
       color: #0e5737;
+      white-space: pre-line;
     }
 
     .card p {
