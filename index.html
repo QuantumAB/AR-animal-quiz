@@ -1,1 +1,1166 @@
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwVaS9g2YGjB9TFiDs5LW0y_9BQsDImUJiIUv3JdK-UVG7243GHs1GtTcZH2bfgMFJh/exec";
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>AR Quiz Game</title>
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+      font-family: 'Sarabun', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #07140f;
+      color: #ffffff;
+    }
+
+    body {
+      touch-action: none;
+    }
+
+    #video {
+      position: fixed;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+
+    #cameraCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000000;
+      z-index: 1;
+    }
+
+    .shade {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      background:
+        radial-gradient(circle at center, rgba(0,0,0,0.05), rgba(0,0,0,0.48)),
+        linear-gradient(90deg, rgba(0,80,40,0.22), rgba(0,0,0,0), rgba(0,80,40,0.22));
+      pointer-events: none;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .titleBox,
+    .pill,
+    .status {
+      background: rgba(0,0,0,0.64);
+      border: 1px solid rgba(255,255,255,0.18);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+    }
+
+    .titleBox {
+      min-width: 0;
+      border-radius: 20px;
+      padding: 10px 16px;
+    }
+
+    .gameTitle {
+      font-size: clamp(18px, 2.4vw, 30px);
+      font-weight: 900;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topic {
+      font-size: clamp(13px, 1.6vw, 18px);
+      opacity: 0.9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: clamp(16px, 2vw, 24px);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .main {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      display: grid;
+      grid-template-columns: 28% 44% 28%;
+      align-items: center;
+      padding: 82px 18px 72px;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .choice {
+      height: min(70vh, 620px);
+      border-radius: 34px;
+      border: 6px solid rgba(255,255,255,0.78);
+      background: rgba(0,0,0,0.34);
+      box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 16px;
+      backdrop-filter: blur(6px);
+      pointer-events: auto;
+      user-select: none;
+      transition: 0.18s ease;
+    }
+
+    .choice.left {
+      background: rgba(0, 116, 88, 0.42);
+    }
+
+    .choice.right {
+      background: rgba(84, 72, 153, 0.42);
+    }
+
+    .choiceIcon {
+      font-size: clamp(58px, 8vw, 110px);
+      line-height: 1;
+      margin-bottom: 18px;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4));
+    }
+
+    .choiceLabel {
+      font-size: clamp(24px, 3.3vw, 48px);
+      font-weight: 900;
+      line-height: 1.18;
+      text-shadow: 0 4px 10px rgba(0,0,0,0.55);
+    }
+
+    .choiceHint {
+      margin-top: 14px;
+      font-size: clamp(14px, 1.6vw, 20px);
+      opacity: 0.92;
+      font-weight: 700;
+    }
+
+    .choice.hover {
+      transform: scale(1.035);
+      border-color: #ffe86a;
+      box-shadow: 0 0 35px rgba(255, 232, 106, 0.95), 0 12px 45px rgba(0,0,0,0.45);
+      background: rgba(255, 205, 39, 0.60);
+    }
+
+    .choice.correct {
+      border-color: #71ff9b;
+      background: rgba(0, 190, 85, 0.72);
+      box-shadow: 0 0 40px rgba(113, 255, 155, 0.95);
+    }
+
+    .choice.wrong {
+      border-color: #ff8b8b;
+      background: rgba(210, 0, 35, 0.65);
+      box-shadow: 0 0 35px rgba(255, 139, 139, 0.75);
+    }
+
+    .questionPanel {
+      align-self: center;
+      border-radius: 34px;
+      padding: 26px 22px;
+      background: rgba(0,0,0,0.66);
+      border: 1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 16px 45px rgba(0,0,0,0.48);
+      backdrop-filter: blur(9px);
+      text-align: center;
+      pointer-events: auto;
+    }
+
+    .questionNo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 8px 18px;
+      background: rgba(255,255,255,0.16);
+      font-size: clamp(16px, 1.8vw, 22px);
+      font-weight: 900;
+      margin-bottom: 14px;
+    }
+
+    .animalName {
+      font-size: clamp(42px, 6vw, 82px);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 10px;
+      color: #fff7bd;
+      text-shadow: 0 5px 16px rgba(0,0,0,0.55);
+    }
+
+    .questionText {
+      font-size: clamp(22px, 2.8vw, 38px);
+      font-weight: 900;
+      line-height: 1.35;
+    }
+
+    .explainBox {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.12);
+      font-size: clamp(16px, 1.8vw, 23px);
+      line-height: 1.35;
+      display: none;
+    }
+
+    .timerWrap {
+      margin-top: 18px;
+      height: 16px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.18);
+    }
+
+    .timerBar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #77ff9b, #ffe86a, #ff8a8a);
+      transition: width 0.2s linear;
+    }
+
+    .holdCircle {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      margin: 20px auto 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      border: 8px solid rgba(255,255,255,0.25);
+      background: conic-gradient(#ffe86a var(--p), rgba(255,255,255,0.22) 0);
+      box-shadow: 0 0 25px rgba(255,232,106,0.55);
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .bottombar {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .status {
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: clamp(14px, 1.8vw, 20px);
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .smallBtn {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: #ffffff;
+      color: #11402b;
+      font-size: clamp(14px, 1.7vw, 19px);
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    .smallBtn:active {
+      transform: scale(0.98);
+    }
+
+    .handDot {
+      position: fixed;
+      z-index: 6;
+      width: 34px;
+      height: 34px;
+      margin-left: -17px;
+      margin-top: -17px;
+      border-radius: 50%;
+      border: 4px solid #ffffff;
+      background: #ffe86a;
+      box-shadow: 0 0 25px rgba(255,232,106,0.9);
+      pointer-events: none;
+      display: none;
+    }
+
+    .startScreen,
+    .endScreen,
+    .loadingScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at top left, rgba(70,210,120,0.35), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(80,120,255,0.35), transparent 35%),
+        rgba(5,18,13,0.96);
+      padding: 24px;
+    }
+
+    .card {
+      width: min(780px, 94vw);
+      border-radius: 34px;
+      background: rgba(255,255,255,0.96);
+      color: #103c2b;
+      padding: 30px;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+      text-align: center;
+    }
+
+    .card h1 {
+      margin: 0 0 8px;
+      font-size: clamp(30px, 5vw, 56px);
+      line-height: 1.1;
+      color: #0e5737;
+    }
+
+    .card p {
+      margin: 8px 0;
+      font-size: clamp(17px, 2.2vw, 24px);
+      line-height: 1.35;
+    }
+
+    .nameInput {
+      width: 100%;
+      margin: 18px 0 10px;
+      border: 3px solid #0e8a58;
+      border-radius: 22px;
+      padding: 16px 18px;
+      font-size: 24px;
+      text-align: center;
+      font-weight: 800;
+      outline: none;
+    }
+
+    .startBtn {
+      width: 100%;
+      border: none;
+      border-radius: 24px;
+      margin-top: 12px;
+      padding: 18px 20px;
+      background: linear-gradient(135deg, #0a8f58, #18bf73);
+      color: white;
+      font-size: clamp(24px, 3vw, 34px);
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 12px 28px rgba(0, 130, 80, 0.35);
+    }
+
+    .startBtn:active {
+      transform: scale(0.99);
+    }
+
+    .loadingScreen {
+      display: none;
+      z-index: 21;
+    }
+
+    .spinner {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: 10px solid rgba(255,255,255,0.25);
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 18px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hide {
+      display: none !important;
+    }
+
+    .debugBox {
+      position: fixed;
+      top: 86px;
+      left: 12px;
+      z-index: 30;
+      max-width: min(620px, calc(100vw - 24px));
+      max-height: 34vh;
+      overflow: auto;
+      display: none;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.78);
+      color: #ffffff;
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    @media (orientation: portrait) {
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        padding-top: 112px;
+        padding-bottom: 86px;
+      }
+
+      .choice {
+        height: 18vh;
+        border-radius: 24px;
+        flex-direction: row;
+        gap: 18px;
+      }
+
+      .choiceIcon {
+        margin-bottom: 0;
+        font-size: 54px;
+      }
+
+      .questionPanel {
+        order: -1;
+      }
+
+      .animalName {
+        font-size: clamp(40px, 12vw, 72px);
+      }
+
+      .questionText {
+        font-size: clamp(22px, 6vw, 34px);
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .pill {
+        display: inline-block;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="cameraCanvas"></canvas>
+  <div class="shade"></div>
+  <div id="handDot" class="handDot"></div>
+  <div id="debugBox" class="debugBox"></div>
+
+  <div class="topbar">
+    <div class="titleBox">
+      <div id="gameTitle" class="gameTitle">เกม AR จำแนกสัตว์</div>
+      <div id="topic" class="topic">การจำแนกสัตว์มีกระดูกสันหลัง</div>
+    </div>
+    <div id="scoreBox" class="pill">คะแนน 0</div>
+    <div id="timeBox" class="pill">เวลา 10</div>
+  </div>
+
+  <div class="main">
+    <div id="leftChoice" class="choice left">
+      <div class="choiceIcon">🖐️</div>
+      <div class="choiceLabel" id="leftText">มีกระดูกสันหลัง</div>
+      <div class="choiceHint">เอามือเข้ากรอบซ้าย</div>
+    </div>
+
+    <div class="questionPanel">
+      <div id="questionNo" class="questionNo">ข้อ 1 / 20</div>
+      <div id="animalName" class="animalName">สัตว์</div>
+      <div id="questionText" class="questionText">กดเริ่มเกม</div>
+      <div id="explainBox" class="explainBox"></div>
+      <div class="timerWrap">
+        <div id="timerBar" class="timerBar"></div>
+      </div>
+      <div id="holdCircle" class="holdCircle" style="--p:0%">0%</div>
+    </div>
+
+    <div id="rightChoice" class="choice right">
+      <div class="choiceIcon">🖐️</div>
+      <div class="choiceLabel" id="rightText">ไม่มีกระดูกสันหลัง</div>
+      <div class="choiceHint">เอามือเข้ากรอบขวา</div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div id="status" class="status">หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม</div>
+    <button id="restartBtn" type="button" class="smallBtn">เริ่มใหม่</button>
+  </div>
+
+  <div id="startScreen" class="startScreen">
+    <div class="card">
+      <h1 id="startTitle">เกม AR จำแนกสัตว์</h1>
+      <p id="startTopic">เรื่อง การจำแนกสัตว์มีกระดูกสันหลัง</p>
+      <p>ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ</p>
+      <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)">
+      <button id="startBtn" type="button" class="startBtn">เริ่มเกม</button>
+      <p style="font-size:16px; opacity:.75;">
+        แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages
+      </p>
+    </div>
+  </div>
+
+  <div id="loadingScreen" class="loadingScreen">
+    <div class="card">
+      <div class="spinner"></div>
+      <h1>กำลังเตรียมเกม</h1>
+      <p id="loadingText">กำลังเริ่มระบบ...</p>
+    </div>
+  </div>
+
+  <div id="endScreen" class="endScreen hide">
+    <div class="card">
+      <h1>จบเกมแล้ว</h1>
+      <p id="finalScore">ได้คะแนน 0 / 0</p>
+      <p id="finalPercent">คิดเป็น 0%</p>
+      <button id="playAgainBtn" type="button" class="startBtn">เล่นอีกครั้ง</button>
+    </div>
+  </div>
+
+  <script>
+    /*******************************************************
+     * ตั้งค่าลิงก์ Apps Script API
+     *******************************************************/
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwVaS9g2YGjB9TFiDs5LW0y_9BQsDImUJiIUv3JdK-UVG7243GHs1GtTcZH2bfgMFJh/exec";
+    const GAME_SET = new URLSearchParams(location.search).get('set') || 'vertebrate100';
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('cameraCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const leftChoice = document.getElementById('leftChoice');
+    const rightChoice = document.getElementById('rightChoice');
+    const handDot = document.getElementById('handDot');
+    const holdCircle = document.getElementById('holdCircle');
+    const debugBox = document.getElementById('debugBox');
+
+    let config = {};
+    let questions = [];
+    let currentIndex = 0;
+    let score = 0;
+    let locked = false;
+    let currentHoverSide = null;
+    let holdStart = null;
+    let questionStartedAt = 0;
+    let gameStartedAt = 0;
+    let timerInterval = null;
+    let camera = null;
+    let hands = null;
+    let isCameraReady = false;
+    let isGameRunning = false;
+    let isStarting = false;
+    let lastFrameAt = 0;
+
+    function debugLog(text) {
+      const time = new Date().toLocaleTimeString('th-TH');
+      debugBox.style.display = 'block';
+      debugBox.textContent += '[' + time + '] ' + text + '\n';
+      debugBox.scrollTop = debugBox.scrollHeight;
+      console.log(text);
+    }
+
+    function setStatus(text) {
+      document.getElementById('status').textContent = text;
+      console.log('[STATUS]', text);
+    }
+
+    function showLoading(text) {
+      document.getElementById('loadingText').textContent = text || 'กำลังโหลด...';
+      document.getElementById('loadingScreen').style.display = 'flex';
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingScreen').style.display = 'none';
+    }
+
+    function normalizeBool(value, defaultValue) {
+      if (value === undefined || value === null || value === '') return defaultValue;
+      return String(value).toUpperCase() === 'TRUE';
+    }
+
+    function getNumber(value, defaultValue) {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 ? n : defaultValue;
+    }
+
+    function gasJsonp(params) {
+      return new Promise((resolve, reject) => {
+        const callbackName = '__gasJsonp_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
+        const url = new URL(GAS_URL);
+        Object.keys(params).forEach(key => {
+          url.searchParams.set(key, params[key]);
+        });
+        url.searchParams.set('callback', callbackName);
+        url.searchParams.set('_', Date.now());
+
+        const script = document.createElement('script');
+
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error('เชื่อมต่อ Apps Script ไม่สำเร็จ หรือใช้เวลานานเกินไป'));
+        }, 20000);
+
+        function cleanup() {
+          clearTimeout(timer);
+          delete window[callbackName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[callbackName] = function(data) {
+          cleanup();
+          if (data && data.ok === false) {
+            reject(new Error(data.error || 'Apps Script ส่ง error กลับมา'));
+            return;
+          }
+          resolve(data);
+        };
+
+        script.onerror = function() {
+          cleanup();
+          reject(new Error('โหลดข้อมูลจาก Apps Script ไม่สำเร็จ ตรวจสอบ GAS_URL และการ Deploy'));
+        };
+
+        script.src = url.toString();
+        document.body.appendChild(script);
+      });
+    }
+
+    function bindButtons() {
+      const startBtn = document.getElementById('startBtn');
+      const restartBtn = document.getElementById('restartBtn');
+      const playAgainBtn = document.getElementById('playAgainBtn');
+
+      startBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        debugLog('คลิกปุ่มเริ่มเกมแล้ว');
+        startGame();
+      });
+
+      restartBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        restartGame();
+      });
+
+      playAgainBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        restartGame();
+      });
+
+      leftChoice.addEventListener('click', function() {
+        manualAnswer('left');
+      });
+
+      rightChoice.addEventListener('click', function() {
+        manualAnswer('right');
+      });
+
+      setStatus('หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม');
+      debugLog('ผูกปุ่มเรียบร้อย');
+    }
+
+    async function startGame() {
+      if (isStarting) {
+        debugLog('ระบบกำลังเริ่มอยู่แล้ว จึงไม่เริ่มซ้ำ');
+        return;
+      }
+
+      isStarting = true;
+
+      try {
+        setStatus('กำลังเริ่มเกม...');
+        debugLog('เริ่ม startGame');
+
+        document.getElementById('startScreen').classList.add('hide');
+        document.getElementById('endScreen').classList.add('hide');
+
+        showLoading('กำลังเปิดกล้อง...');
+        debugLog('กำลังเปิดกล้องจาก GitHub Pages');
+
+        await setupCameraAndHands();
+
+        showLoading('กำลังโหลดคำถามจากชีต...');
+        debugLog('กล้องพร้อมแล้ว กำลังโหลดคำถามจาก Apps Script API');
+
+        await loadGameData();
+
+        currentIndex = 0;
+        score = 0;
+        locked = false;
+        gameStartedAt = Date.now();
+        isGameRunning = true;
+
+        hideLoading();
+        loadQuestion();
+        setStatus('ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้');
+        debugLog('เริ่มเกมสำเร็จ มีคำถาม ' + questions.length + ' ข้อ');
+
+      } catch (err) {
+        console.error(err);
+        debugLog('ERROR startGame: ' + (err && err.message ? err.message : err));
+        hideLoading();
+        document.getElementById('startScreen').classList.remove('hide');
+        setStatus('เริ่มเกมไม่ได้: ' + (err && err.message ? err.message : err));
+        alert('เริ่มเกมไม่ได้\n' + (err && err.message ? err.message : err));
+      } finally {
+        isStarting = false;
+      }
+    }
+
+    async function loadGameData() {
+      const data = await gasJsonp({
+        action: 'getGameData',
+        set: GAME_SET
+      });
+
+      debugLog('โหลดข้อมูลจาก Apps Script API สำเร็จ');
+
+      config = data && data.config ? data.config : {};
+      questions = data && data.questions ? data.questions : [];
+
+      if (!questions.length) {
+        throw new Error('ไม่พบคำถามในชีต Questions หรือ set ไม่ตรง');
+      }
+
+      applyConfigToUI();
+    }
+
+    function applyConfigToUI() {
+      const gameTitle = config.gameTitle || 'เกม AR จำแนกสัตว์';
+      const topic = config.topic || 'การจำแนกสัตว์มีกระดูกสันหลัง';
+
+      document.title = gameTitle;
+      document.getElementById('gameTitle').textContent = gameTitle;
+      document.getElementById('topic').textContent = topic;
+      document.getElementById('startTitle').textContent = gameTitle;
+      document.getElementById('startTopic').textContent = 'เรื่อง ' + topic;
+
+      const leftDefault = config.leftDefault || 'มีกระดูกสันหลัง';
+      const rightDefault = config.rightDefault || 'ไม่มีกระดูกสันหลัง';
+
+      document.getElementById('leftText').textContent = leftDefault;
+      document.getElementById('rightText').textContent = rightDefault;
+    }
+
+    async function setupCameraAndHands() {
+      resizeCanvas();
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('เบราว์เซอร์นี้ไม่รองรับการเปิดกล้อง getUserMedia');
+      }
+
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        throw new Error('ต้องเปิดผ่าน HTTPS เท่านั้น เช่น GitHub Pages');
+      }
+
+      if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+        throw new Error('โหลด MediaPipe ไม่สำเร็จ กรุณาเช็กอินเทอร์เน็ต หรือเปิดใหม่อีกครั้ง');
+      }
+
+      if (!hands) {
+        debugLog('สร้าง MediaPipe Hands');
+
+        hands = new Hands({
+          locateFile: function(file) {
+            return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file;
+          }
+        });
+
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.55
+        });
+
+        hands.onResults(onHandResults);
+      }
+
+      if (!camera) {
+        debugLog('สร้าง MediaPipe Camera');
+
+        camera = new Camera(video, {
+          onFrame: async function() {
+            if (hands && video.readyState >= 2) {
+              await hands.send({ image: video });
+            }
+          },
+          width: 1280,
+          height: 720
+        });
+      }
+
+      if (!isCameraReady) {
+        debugLog('เรียก camera.start()');
+        await camera.start();
+        isCameraReady = true;
+        debugLog('camera.start() สำเร็จ');
+
+        setTimeout(function() {
+          if (!lastFrameAt) {
+            debugLog('ยังไม่มี frame จากกล้องภายใน 3 วินาที แต่ระบบจะลองทำงานต่อ');
+          }
+        }, 3000);
+      }
+    }
+
+    function onHandResults(results) {
+      lastFrameAt = Date.now();
+      drawCameraFrame(results);
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        const indexTip = landmarks[8];
+
+        const hand = {
+          x: 1 - indexTip.x,
+          y: indexTip.y
+        };
+
+        updateHandDot(hand.x, hand.y);
+        checkHandZone(hand.x, hand.y);
+      } else {
+        handDot.style.display = 'none';
+        clearHover();
+      }
+    }
+
+    function drawCameraFrame(results) {
+      resizeCanvas();
+
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      if (results.multiHandLandmarks) {
+        ctx.save();
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+
+        for (const landmarks of results.multiHandLandmarks) {
+          drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
+            color: '#FFFFFF',
+            lineWidth: 4
+          });
+
+          drawLandmarks(ctx, landmarks, {
+            color: '#FFE86A',
+            lineWidth: 2,
+            radius: 4
+          });
+        }
+
+        ctx.restore();
+      }
+    }
+
+    function updateHandDot(x, y) {
+      handDot.style.display = 'block';
+      handDot.style.left = (x * window.innerWidth) + 'px';
+      handDot.style.top = (y * window.innerHeight) + 'px';
+    }
+
+    function checkHandZone(x, y) {
+      if (!isGameRunning || locked) return;
+
+      let side = null;
+
+      if (x <= 0.30 && y >= 0.10 && y <= 0.92) {
+        side = 'left';
+      } else if (x >= 0.70 && y >= 0.10 && y <= 0.92) {
+        side = 'right';
+      }
+
+      if (!side) {
+        clearHover();
+        return;
+      }
+
+      if (currentHoverSide !== side) {
+        currentHoverSide = side;
+        holdStart = Date.now();
+        setHover(side);
+      }
+
+      const holdMs = getNumber(config.holdToAnswerMs, 1500);
+      const elapsed = Date.now() - holdStart;
+      const percent = Math.min(100, Math.round((elapsed / holdMs) * 100));
+
+      holdCircle.style.display = 'flex';
+      holdCircle.style.setProperty('--p', percent + '%');
+      holdCircle.textContent = percent + '%';
+
+      if (elapsed >= holdMs) {
+        submitAnswer(side);
+      }
+    }
+
+    function setHover(side) {
+      leftChoice.classList.toggle('hover', side === 'left');
+      rightChoice.classList.toggle('hover', side === 'right');
+
+      if (side === 'left') {
+        setStatus('กำลังเลือกคำตอบซ้าย... ค้างไว้');
+      } else {
+        setStatus('กำลังเลือกคำตอบขวา... ค้างไว้');
+      }
+    }
+
+    function clearHover() {
+      currentHoverSide = null;
+      holdStart = null;
+
+      leftChoice.classList.remove('hover');
+      rightChoice.classList.remove('hover');
+
+      if (!locked) {
+        holdCircle.style.display = 'none';
+      }
+    }
+
+    function loadQuestion() {
+      locked = false;
+      clearHover();
+
+      leftChoice.classList.remove('correct', 'wrong');
+      rightChoice.classList.remove('correct', 'wrong');
+
+      const q = questions[currentIndex];
+      const total = questions.length;
+
+      document.getElementById('questionNo').textContent = 'ข้อ ' + (currentIndex + 1) + ' / ' + total;
+      document.getElementById('animalName').textContent = q.animal || 'สัตว์';
+      document.getElementById('questionText').textContent = q.question || '';
+      document.getElementById('leftText').textContent = q.leftText || config.leftDefault || 'มีกระดูกสันหลัง';
+      document.getElementById('rightText').textContent = q.rightText || config.rightDefault || 'ไม่มีกระดูกสันหลัง';
+
+      document.getElementById('scoreBox').textContent = 'คะแนน ' + score;
+      document.getElementById('explainBox').style.display = 'none';
+      document.getElementById('explainBox').textContent = '';
+      holdCircle.style.display = 'none';
+
+      questionStartedAt = Date.now();
+
+      startTimerForQuestion(q);
+      setStatus('ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้');
+    }
+
+    function startTimerForQuestion(q) {
+      clearInterval(timerInterval);
+
+      const sec = getNumber(q.timeSec, getNumber(config.timePerQuestion, 10));
+      const totalMs = sec * 1000;
+
+      document.getElementById('timeBox').textContent = 'เวลา ' + sec;
+      document.getElementById('timerBar').style.width = '100%';
+
+      timerInterval = setInterval(function() {
+        if (locked || !isGameRunning) return;
+
+        const elapsed = Date.now() - questionStartedAt;
+        const remainMs = Math.max(0, totalMs - elapsed);
+        const remainSec = Math.ceil(remainMs / 1000);
+        const percent = Math.max(0, Math.round((remainMs / totalMs) * 100));
+
+        document.getElementById('timeBox').textContent = 'เวลา ' + remainSec;
+        document.getElementById('timerBar').style.width = percent + '%';
+
+        if (remainMs <= 0) {
+          submitAnswer('timeout');
+        }
+      }, 200);
+    }
+
+    function manualAnswer(side) {
+      if (!isGameRunning || locked) return;
+      submitAnswer(side);
+    }
+
+    function submitAnswer(side) {
+      if (locked) return;
+
+      locked = true;
+      clearInterval(timerInterval);
+      holdCircle.style.display = 'none';
+
+      const q = questions[currentIndex];
+      const correctSide = String(q.correct || '').toLowerCase();
+      const isCorrect = side === correctSide;
+
+      if (isCorrect) {
+        score++;
+      }
+
+      showAnswerResult(side, correctSide, isCorrect, q);
+      document.getElementById('scoreBox').textContent = 'คะแนน ' + score;
+
+      setTimeout(function() {
+        currentIndex++;
+
+        if (currentIndex >= questions.length) {
+          finishGame();
+        } else {
+          loadQuestion();
+        }
+      }, 1800);
+    }
+
+    function showAnswerResult(selectedSide, correctSide, isCorrect, q) {
+      leftChoice.classList.remove('hover');
+      rightChoice.classList.remove('hover');
+
+      if (correctSide === 'left') leftChoice.classList.add('correct');
+      if (correctSide === 'right') rightChoice.classList.add('correct');
+
+      if (!isCorrect) {
+        if (selectedSide === 'left') leftChoice.classList.add('wrong');
+        if (selectedSide === 'right') rightChoice.classList.add('wrong');
+      }
+
+      const explainBox = document.getElementById('explainBox');
+      const showExplanation = normalizeBool(config.showExplanation, true);
+
+      if (showExplanation && q.explanation) {
+        explainBox.textContent = q.explanation;
+        explainBox.style.display = 'block';
+      }
+
+      if (selectedSide === 'timeout') {
+        setStatus('หมดเวลา!');
+      } else if (isCorrect) {
+        setStatus('ถูกต้อง!');
+      } else {
+        setStatus('ยังไม่ถูก!');
+      }
+    }
+
+    async function finishGame() {
+      isGameRunning = false;
+      clearInterval(timerInterval);
+      clearHover();
+
+      const total = questions.length;
+      const percent = total > 0 ? Math.round((score / total) * 100) : 0;
+      const durationSec = Math.round((Date.now() - gameStartedAt) / 1000);
+      const playerName = document.getElementById('playerName').value.trim();
+
+      document.getElementById('finalScore').textContent = 'ได้คะแนน ' + score + ' / ' + total;
+      document.getElementById('finalPercent').textContent = 'คิดเป็น ' + percent + '%';
+      document.getElementById('endScreen').classList.remove('hide');
+
+      setStatus('จบเกมแล้ว กำลังบันทึกคะแนน...');
+      debugLog('จบเกม คะแนน ' + score + '/' + total);
+
+      try {
+        await gasJsonp({
+          action: 'saveScore',
+          playerName: playerName,
+          set: GAME_SET || config.gameSet || '',
+          score: score,
+          total: total,
+          durationSec: durationSec,
+          device: navigator.userAgent.substring(0, 450),
+          note: 'AR hand zone - GitHub Pages'
+        });
+        setStatus('บันทึกคะแนนลงชีต Scores แล้ว');
+      } catch (err) {
+        setStatus('บันทึกคะแนนไม่ได้: ' + err.message);
+        debugLog('บันทึกคะแนนไม่ได้: ' + err.message);
+      }
+    }
+
+    function restartGame() {
+      location.reload();
+    }
+
+    function resizeCanvas() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    window.addEventListener('orientationchange', function() {
+      setTimeout(resizeCanvas, 350);
+    });
+
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowLeft') manualAnswer('left');
+      if (e.key === 'ArrowRight') manualAnswer('right');
+    });
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      const text = 'เกิดข้อผิดพลาด: ' + message + ' บรรทัด ' + lineno;
+      debugLog(text);
+      console.error(text, error);
+      setStatus(text);
+      hideLoading();
+      document.getElementById('startScreen').classList.remove('hide');
+      alert(text);
+    };
+
+    window.addEventListener('unhandledrejection', function(event) {
+      const message = event.reason && event.reason.message ? event.reason.message : String(event.reason);
+      const text = 'เกิดข้อผิดพลาด async: ' + message;
+      debugLog(text);
+      console.error(event.reason);
+      setStatus(text);
+      hideLoading();
+      document.getElementById('startScreen').classList.remove('hide');
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+      resizeCanvas();
+      bindButtons();
+      debugLog('DOMContentLoaded สำเร็จ');
+      debugLog('GAS_URL = ' + GAS_URL);
+    });
+  </script>
+</body>
+</html>
