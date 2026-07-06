@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8">
@@ -278,7 +278,7 @@
       bottom: 12px;
       z-index: 5;
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr auto auto;
       gap: 10px;
       align-items: center;
     }
@@ -521,6 +521,7 @@
 
   <div class="bottombar">
     <div id="status" class="status">หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม</div>
+    <button id="soundBtn" type="button" class="smallBtn">เสียง: เปิด</button>
     <button id="restartBtn" type="button" class="smallBtn">เริ่มใหม่</button>
   </div>
 
@@ -528,7 +529,7 @@
     <div class="card">
       <h1 id="startTitle">เกม AR จำแนกสัตว์</h1>
       <p id="startTopic">เรื่อง การจำแนกสัตว์มีกระดูกสันหลัง</p>
-      <p>ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ</p>
+      <p>ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมเสียงเอฟเฟกต์และดนตรีเบา ๆ</p>
       <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)">
       <button id="startBtn" type="button" class="startBtn">เริ่มเกม</button>
       <p style="font-size:16px; opacity:.75;">
@@ -588,12 +589,15 @@
     let isStarting = false;
     let lastFrameAt = 0;
 
+    // เสียงและดนตรี: ใช้ Web Audio API สร้างเสียงในตัว ไม่ต้องมีไฟล์เสียงแยก
+    let soundEnabled = true;
+    let audioCtx = null;
+    let masterGain = null;
+    let musicTimer = null;
+
     function debugLog(text) {
-      const time = new Date().toLocaleTimeString('th-TH');
-      debugBox.style.display = 'block';
-      debugBox.textContent += '[' + time + '] ' + text + '\n';
-      debugBox.scrollTop = debugBox.scrollHeight;
-      console.log(text);
+      // ซ่อนกล่อง debug บนหน้าจอแล้ว เหลือไว้แค่ console เพื่อไม่ให้รบกวนตอนเล่นจริง
+      console.log('[DEBUG]', text);
     }
 
     function setStatus(text) {
@@ -618,6 +622,150 @@
     function getNumber(value, defaultValue) {
       const n = Number(value);
       return Number.isFinite(n) && n > 0 ? n : defaultValue;
+    }
+
+    function initAudio() {
+      if (!soundEnabled) return;
+
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          setStatus('อุปกรณ์นี้ไม่รองรับระบบเสียง Web Audio');
+          return;
+        }
+
+        audioCtx = new AudioContextClass();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.75;
+        masterGain.connect(audioCtx.destination);
+      }
+    }
+
+    async function unlockAudio() {
+      if (!soundEnabled) return;
+      initAudio();
+
+      if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+    }
+
+    function tone(freq, duration, type, volume, delay) {
+      if (!soundEnabled || !audioCtx || !masterGain) return;
+
+      const now = audioCtx.currentTime + (delay || 0);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume || 0.12), now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + duration + 0.04);
+    }
+
+    function noiseBurst(duration, volume, delay) {
+      if (!soundEnabled || !audioCtx || !masterGain) return;
+
+      const now = audioCtx.currentTime + (delay || 0);
+      const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      }
+
+      const source = audioCtx.createBufferSource();
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(volume || 0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      source.buffer = buffer;
+      source.connect(gain);
+      gain.connect(masterGain);
+      source.start(now);
+    }
+
+    function playStartSound() {
+      tone(392, 0.10, 'triangle', 0.12, 0);
+      tone(523.25, 0.12, 'triangle', 0.13, 0.10);
+      tone(659.25, 0.16, 'triangle', 0.13, 0.22);
+    }
+
+    function playCorrectSound() {
+      tone(659.25, 0.10, 'sine', 0.16, 0);
+      tone(783.99, 0.10, 'sine', 0.16, 0.10);
+      tone(1046.50, 0.18, 'triangle', 0.14, 0.22);
+    }
+
+    function playWrongSound() {
+      tone(220, 0.16, 'sawtooth', 0.10, 0);
+      tone(164.81, 0.20, 'sawtooth', 0.09, 0.15);
+      noiseBurst(0.10, 0.05, 0.05);
+    }
+
+    function playTimeoutSound() {
+      tone(330, 0.12, 'square', 0.08, 0);
+      tone(247, 0.18, 'square', 0.07, 0.16);
+    }
+
+    function playFinishSound() {
+      tone(523.25, 0.11, 'triangle', 0.12, 0);
+      tone(659.25, 0.11, 'triangle', 0.12, 0.12);
+      tone(783.99, 0.11, 'triangle', 0.12, 0.24);
+      tone(1046.50, 0.28, 'triangle', 0.13, 0.38);
+    }
+
+    function startBackgroundMusic() {
+      if (!soundEnabled || !audioCtx || musicTimer) return;
+
+      function loop() {
+        if (!soundEnabled || !audioCtx) return;
+        tone(261.63, 0.18, 'sine', 0.035, 0.00);
+        tone(329.63, 0.18, 'sine', 0.030, 0.45);
+        tone(392.00, 0.18, 'sine', 0.030, 0.90);
+        tone(523.25, 0.20, 'sine', 0.028, 1.35);
+        tone(392.00, 0.18, 'sine', 0.026, 1.90);
+        tone(329.63, 0.18, 'sine', 0.026, 2.35);
+      }
+
+      loop();
+      musicTimer = setInterval(loop, 3200);
+    }
+
+    function stopBackgroundMusic() {
+      if (musicTimer) {
+        clearInterval(musicTimer);
+        musicTimer = null;
+      }
+    }
+
+    async function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundBtn');
+
+      if (!soundEnabled) {
+        stopBackgroundMusic();
+        if (masterGain) masterGain.gain.value = 0;
+        btn.textContent = 'เสียง: ปิด';
+        setStatus('ปิดเสียงแล้ว');
+        return;
+      }
+
+      if (masterGain) masterGain.gain.value = 0.75;
+      btn.textContent = 'เสียง: เปิด';
+      await unlockAudio();
+      playStartSound();
+      startBackgroundMusic();
+      setStatus('เปิดเสียงแล้ว');
     }
 
     function gasJsonp(params) {
@@ -667,6 +815,7 @@
       const startBtn = document.getElementById('startBtn');
       const restartBtn = document.getElementById('restartBtn');
       const playAgainBtn = document.getElementById('playAgainBtn');
+      const soundBtn = document.getElementById('soundBtn');
 
       startBtn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -682,6 +831,11 @@
       playAgainBtn.addEventListener('click', function(e) {
         e.preventDefault();
         restartGame();
+      });
+
+      soundBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        toggleSound();
       });
 
       leftChoice.addEventListener('click', function() {
@@ -707,6 +861,11 @@
       try {
         setStatus('กำลังเริ่มเกม...');
         debugLog('เริ่ม startGame');
+
+        // iPad/Safari ต้องเริ่มเสียงจากการแตะของผู้ใช้โดยตรง
+        await unlockAudio();
+        playStartSound();
+        startBackgroundMusic();
 
         document.getElementById('startScreen').classList.add('hide');
         document.getElementById('endScreen').classList.add('hide');
@@ -1030,6 +1189,11 @@
 
       if (isCorrect) {
         score++;
+        playCorrectSound();
+      } else if (side === 'timeout') {
+        playTimeoutSound();
+      } else {
+        playWrongSound();
       }
 
       showAnswerResult(side, correctSide, isCorrect, q);
@@ -1091,6 +1255,7 @@
 
       setStatus('จบเกมแล้ว กำลังบันทึกคะแนน...');
       debugLog('จบเกม คะแนน ' + score + '/' + total);
+      playFinishSound();
 
       try {
         await gasJsonp({
