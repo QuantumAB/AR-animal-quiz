@@ -387,6 +387,11 @@
       line-height: 1.35;
     }
 
+    .startText,
+    .startNote {
+      white-space: pre-line;
+    }
+
     .nameInput {
       width: 100%;
       margin: 18px 0 10px;
@@ -580,13 +585,11 @@
   <div id="startScreen" class="startScreen">
     <div class="card">
       <h1 id="startTitle">เกม AR จำแนกสัตว์</h1>
-      <p id="startTopic">เรื่อง การจำแนกสัตว์มีกระดูกสันหลัง</p>
-      <p>ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ</p>
+      <p id="startTopic" class="startText">เรื่อง การจำแนกสัตว์มีกระดูกสันหลัง</p>
+      <p id="startInstruction" class="startText">ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ</p>
       <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)">
       <button id="startBtn" type="button" class="startBtn">เริ่มเกม</button>
-      <p style="font-size:16px; opacity:.75;">
-        แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages
-      </p>
+      <p id="startNote" class="startNote" style="font-size:16px; opacity:.75;">แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages</p>
     </div>
   </div>
 
@@ -949,6 +952,19 @@
       debugLog('ผูกปุ่มเรียบร้อย');
     }
 
+
+    async function preloadGameData() {
+      try {
+        setStatus('กำลังโหลดการตั้งค่าจากชีต...');
+        await loadGameData();
+        setStatus('หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม');
+        debugLog('โหลดการตั้งค่าหน้าแรกจาก Config สำเร็จ');
+      } catch (err) {
+        debugLog('โหลดการตั้งค่าหน้าแรกไม่ได้: ' + (err && err.message ? err.message : err));
+        setStatus('หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม');
+      }
+    }
+
     async function startGame() {
       if (isStarting) {
         debugLog('ระบบกำลังเริ่มอยู่แล้ว จึงไม่เริ่มซ้ำ');
@@ -977,7 +993,11 @@
         showLoading('กำลังโหลดคำถามจากชีต...');
         debugLog('กล้องพร้อมแล้ว กำลังโหลดคำถามจาก Apps Script API');
 
-        await loadGameData();
+        if (!questions.length) {
+          await loadGameData();
+        } else {
+          applyConfigToUI();
+        }
 
         currentIndex = 0;
         score = 0;
@@ -1020,18 +1040,35 @@
       applyConfigToUI();
     }
 
+    function configText(key, fallback) {
+      if (!config || config[key] === undefined || config[key] === null) return fallback;
+
+      const value = String(config[key]);
+      return value.trim() ? value : fallback;
+    }
+
     function applyConfigToUI() {
-      const gameTitle = config.gameTitle || 'เกม AR จำแนกสัตว์';
-      const topic = config.topic || 'การจำแนกสัตว์มีกระดูกสันหลัง';
+      const gameTitle = configText('gameTitle', 'เกม AR จำแนกสัตว์');
+      const topic = configText('topic', 'การจำแนกสัตว์มีกระดูกสันหลัง');
 
       document.title = gameTitle;
       document.getElementById('gameTitle').textContent = gameTitle;
       document.getElementById('topic').textContent = topic;
       document.getElementById('startTitle').textContent = gameTitle;
-      document.getElementById('startTopic').textContent = 'เรื่อง ' + topic;
+      document.getElementById('startTopic').textContent = configText('startTopicText', 'เรื่อง ' + topic);
+      document.getElementById('startInstruction').textContent = configText(
+        'startInstruction',
+        'ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ'
+      );
+      document.getElementById('playerName').placeholder = configText('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)');
+      document.getElementById('startBtn').textContent = configText('startButtonText', 'เริ่มเกม');
+      document.getElementById('startNote').textContent = configText(
+        'startNote',
+        'แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages'
+      );
 
-      const leftDefault = config.leftDefault || 'มีกระดูกสันหลัง';
-      const rightDefault = config.rightDefault || 'ไม่มีกระดูกสันหลัง';
+      const leftDefault = configText('leftDefault', 'มีกระดูกสันหลัง');
+      const rightDefault = configText('rightDefault', 'ไม่มีกระดูกสันหลัง');
 
       setChoiceLabels(leftDefault, rightDefault);
     }
@@ -1285,7 +1322,16 @@
 
       document.getElementById('questionNo').textContent = 'ข้อ ' + (currentIndex + 1) + ' / ' + total;
       document.getElementById('animalName').textContent = q.animal || 'สัตว์';
-      document.getElementById('questionText').textContent = '';
+
+      const questionTextEl = document.getElementById('questionText');
+      if (normalizeBool(config.showQuestionText, false) && q.question) {
+        questionTextEl.textContent = q.question;
+        questionTextEl.style.display = 'block';
+      } else {
+        questionTextEl.textContent = '';
+        questionTextEl.style.display = 'none';
+      }
+
       setChoiceLabels(q.leftText || config.leftDefault || 'มีกระดูกสันหลัง', q.rightText || config.rightDefault || 'ไม่มีกระดูกสันหลัง');
 
       document.getElementById('scoreBox').textContent = 'คะแนน ' + score;
@@ -1477,6 +1523,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       resizeCanvas();
       bindButtons();
+      preloadGameData();
       debugLog('DOMContentLoaded สำเร็จ');
       debugLog('GAS_URL = ' + GAS_URL);
     });
