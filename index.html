@@ -113,6 +113,11 @@
       font-size: clamp(16px, 2vw, 24px);
       font-weight: 900;
       white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 48px;
     }
 
     #scoreBox {
@@ -244,6 +249,7 @@
     }
 
     .questionText {
+      display: none;
       font-size: clamp(18px, 2.15vw, 30px);
       font-weight: 900;
       line-height: 1.25;
@@ -500,7 +506,8 @@
       }
 
       .pill {
-        display: inline-block;
+        display: flex;
+        width: 100%;
       }
     }
 
@@ -548,7 +555,7 @@
     <div class="questionPanel">
       <div id="questionNo" class="questionNo">ข้อ 1 / 20</div>
       <div id="animalName" class="animalName">สัตว์</div>
-      <div id="questionText" class="questionText">กดเริ่มเกม</div>
+      <div id="questionText" class="questionText"></div>
       <div id="explainBox" class="explainBox"></div>
       <div class="timerWrap">
         <div id="timerBar" class="timerBar"></div>
@@ -1278,7 +1285,7 @@
 
       document.getElementById('questionNo').textContent = 'ข้อ ' + (currentIndex + 1) + ' / ' + total;
       document.getElementById('animalName').textContent = q.animal || 'สัตว์';
-      document.getElementById('questionText').textContent = q.question || '';
+      document.getElementById('questionText').textContent = '';
       setChoiceLabels(q.leftText || config.leftDefault || 'มีกระดูกสันหลัง', q.rightText || config.rightDefault || 'ไม่มีกระดูกสันหลัง');
 
       document.getElementById('scoreBox').textContent = 'คะแนน ' + score;
