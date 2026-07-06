@@ -1096,20 +1096,83 @@
       drawCameraFrame(results);
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmarks = results.multiHandLandmarks[0];
-        const indexTip = landmarks[8];
+        const detectedHands = [];
 
-        const hand = {
-          x: 1 - indexTip.x,
-          y: indexTip.y
-        };
+        for (const landmarks of results.multiHandLandmarks) {
+          const indexTip = landmarks[8];
 
-        updateHandDot(hand.x, hand.y);
-        checkHandZone(hand.x, hand.y);
+          const hand = {
+            x: 1 - indexTip.x, // กลับซ้าย-ขวา เพราะภาพบนจอเป็นกระจก
+            y: indexTip.y
+          };
+
+          hand.side = getAnswerSideFromPoint(hand.x, hand.y);
+          hand.strength = getZoneStrength(hand.x, hand.side);
+
+          detectedHands.push(hand);
+        }
+
+        const activeHands = detectedHands.filter(hand => hand.side);
+
+        if (activeHands.length > 0) {
+          const hasLeft = activeHands.some(hand => hand.side === 'left');
+          const hasRight = activeHands.some(hand => hand.side === 'right');
+
+          // ถ้ามีมืออยู่ทั้งซ้ายและขวาพร้อมกัน ไม่ล็อกคำตอบ เพื่อกันตอบผิด
+          if (hasLeft && hasRight) {
+            const strongest = activeHands.slice().sort((a, b) => b.strength - a.strength)[0];
+            updateHandDot(strongest.x, strongest.y);
+            clearHover();
+            setStatus('เห็นมือทั้งสองฝั่ง เอามือที่ไม่ตอบออกจากกรอบก่อน');
+            return;
+          }
+
+          // เลือกมือที่เข้าโซนคำตอบลึกที่สุด ไม่ยึดติดกับมือแรกที่กล้องเจอ
+          activeHands.sort((a, b) => b.strength - a.strength);
+          const selectedHand = activeHands[0];
+
+          updateHandDot(selectedHand.x, selectedHand.y);
+          checkHandZone(selectedHand.x, selectedHand.y);
+          return;
+        }
+
+        // เห็นมือ แต่ยังไม่เข้าโซนคำตอบ ให้โชว์จุดตามมือที่อยู่ใกล้ขอบที่สุด
+        detectedHands.sort((a, b) => {
+          const aEdge = Math.max(1 - a.x, a.x);
+          const bEdge = Math.max(1 - b.x, b.x);
+          return bEdge - aEdge;
+        });
+
+        updateHandDot(detectedHands[0].x, detectedHands[0].y);
+        clearHover();
       } else {
         handDot.style.display = 'none';
         clearHover();
       }
+    }
+
+    function getAnswerSideFromPoint(x, y) {
+      if (x <= 0.30 && y >= 0.10 && y <= 0.92) {
+        return 'left';
+      }
+
+      if (x >= 0.70 && y >= 0.10 && y <= 0.92) {
+        return 'right';
+      }
+
+      return null;
+    }
+
+    function getZoneStrength(x, side) {
+      if (side === 'left') {
+        return Math.max(0, 0.30 - x);
+      }
+
+      if (side === 'right') {
+        return Math.max(0, x - 0.70);
+      }
+
+      return 0;
     }
 
     function drawCameraFrame(results) {
@@ -1154,13 +1217,7 @@
     function checkHandZone(x, y) {
       if (!isGameRunning || locked) return;
 
-      let side = null;
-
-      if (x <= 0.30 && y >= 0.10 && y <= 0.92) {
-        side = 'left';
-      } else if (x >= 0.70 && y >= 0.10 && y <= 0.92) {
-        side = 'right';
-      }
+      let side = getAnswerSideFromPoint(x, y);
 
       if (!side) {
         clearHover();
