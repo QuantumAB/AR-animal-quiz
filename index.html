@@ -69,7 +69,7 @@
       right: 12px;
       z-index: 5;
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: minmax(260px, 48vw) auto auto;
       gap: 10px;
       align-items: center;
     }
@@ -85,8 +85,9 @@
 
     .titleBox {
       min-width: 0;
-      border-radius: 20px;
-      padding: 10px 16px;
+      width: min(48vw, 720px);
+      border-radius: 18px;
+      padding: 9px 14px;
     }
 
     .gameTitle {
@@ -108,10 +109,24 @@
 
     .pill {
       border-radius: 999px;
-      padding: 10px 16px;
+      padding: 10px 18px;
       font-size: clamp(16px, 2vw, 24px);
       font-weight: 900;
       white-space: nowrap;
+    }
+
+    #scoreBox {
+      background: linear-gradient(135deg, rgba(255, 167, 38, 0.96), rgba(255, 229, 59, 0.96));
+      color: #231200;
+      border-color: rgba(255, 245, 157, 0.95);
+      box-shadow: 0 0 22px rgba(255, 193, 7, 0.55), 0 8px 24px rgba(0,0,0,0.28);
+    }
+
+    #timeBox {
+      background: linear-gradient(135deg, rgba(0, 150, 255, 0.96), rgba(102, 255, 235, 0.96));
+      color: #001b35;
+      border-color: rgba(178, 255, 250, 0.95);
+      box-shadow: 0 0 22px rgba(0, 188, 255, 0.55), 0 8px 24px rgba(0,0,0,0.28);
     }
 
     .main {
@@ -119,17 +134,17 @@
       inset: 0;
       z-index: 4;
       display: grid;
-      grid-template-columns: 28% 44% 28%;
+      grid-template-columns: 22% 56% 22%;
       align-items: center;
-      padding: 82px 18px 72px;
+      padding: 82px 18px 68px;
       gap: 12px;
       pointer-events: none;
     }
 
     .choice {
-      height: min(70vh, 620px);
-      border-radius: 34px;
-      border: 6px solid rgba(255,255,255,0.78);
+      height: min(52vh, 460px);
+      border-radius: 28px;
+      border: 4px solid rgba(255,255,255,0.78);
       background: rgba(0,0,0,0.34);
       box-shadow: 0 10px 35px rgba(0,0,0,0.35);
       display: flex;
@@ -137,8 +152,8 @@
       justify-content: center;
       align-items: center;
       text-align: center;
-      padding: 16px;
-      backdrop-filter: blur(6px);
+      padding: 12px 10px;
+      backdrop-filter: blur(5px);
       pointer-events: auto;
       user-select: none;
       transition: 0.18s ease;
@@ -153,23 +168,24 @@
     }
 
     .choiceIcon {
-      font-size: clamp(58px, 8vw, 110px);
+      font-size: clamp(42px, 5vw, 74px);
       line-height: 1;
-      margin-bottom: 18px;
+      margin-bottom: 12px;
       filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4));
     }
 
     .choiceLabel {
-      font-size: clamp(24px, 3.3vw, 48px);
+      font-size: clamp(24px, 2.9vw, 42px);
       font-weight: 900;
-      line-height: 1.18;
+      line-height: 1.12;
+      white-space: pre-line;
       text-shadow: 0 4px 10px rgba(0,0,0,0.55);
     }
 
     .choiceHint {
-      margin-top: 14px;
-      font-size: clamp(14px, 1.6vw, 20px);
-      opacity: 0.92;
+      margin-top: 10px;
+      font-size: clamp(12px, 1.25vw, 17px);
+      opacity: 0.9;
       font-weight: 700;
     }
 
@@ -193,13 +209,15 @@
     }
 
     .questionPanel {
-      align-self: center;
-      border-radius: 34px;
-      padding: 26px 22px;
-      background: rgba(0,0,0,0.66);
+      align-self: start;
+      width: min(700px, 92%);
+      margin: 4px auto 0;
+      border-radius: 26px;
+      padding: 16px 18px 14px;
+      background: rgba(0,0,0,0.62);
       border: 1px solid rgba(255,255,255,0.22);
-      box-shadow: 0 16px 45px rgba(0,0,0,0.48);
-      backdrop-filter: blur(9px);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.42);
+      backdrop-filter: blur(8px);
       text-align: center;
       pointer-events: auto;
     }
@@ -209,41 +227,41 @@
       align-items: center;
       justify-content: center;
       border-radius: 999px;
-      padding: 8px 18px;
+      padding: 6px 15px;
       background: rgba(255,255,255,0.16);
-      font-size: clamp(16px, 1.8vw, 22px);
+      font-size: clamp(14px, 1.45vw, 19px);
       font-weight: 900;
-      margin-bottom: 14px;
+      margin-bottom: 8px;
     }
 
     .animalName {
-      font-size: clamp(42px, 6vw, 82px);
+      font-size: clamp(34px, 4.8vw, 64px);
       font-weight: 900;
-      line-height: 1.1;
-      margin-bottom: 10px;
+      line-height: 1.05;
+      margin-bottom: 6px;
       color: #fff7bd;
       text-shadow: 0 5px 16px rgba(0,0,0,0.55);
     }
 
     .questionText {
-      font-size: clamp(22px, 2.8vw, 38px);
+      font-size: clamp(18px, 2.15vw, 30px);
       font-weight: 900;
-      line-height: 1.35;
+      line-height: 1.25;
     }
 
     .explainBox {
-      margin-top: 16px;
-      padding: 14px 16px;
-      border-radius: 20px;
+      margin-top: 10px;
+      padding: 10px 13px;
+      border-radius: 18px;
       background: rgba(255,255,255,0.12);
-      font-size: clamp(16px, 1.8vw, 23px);
-      line-height: 1.35;
+      font-size: clamp(14px, 1.45vw, 20px);
+      line-height: 1.28;
       display: none;
     }
 
     .timerWrap {
-      margin-top: 18px;
-      height: 16px;
+      margin-top: 12px;
+      height: 12px;
       border-radius: 999px;
       overflow: hidden;
       background: rgba(255,255,255,0.18);
@@ -257,17 +275,17 @@
     }
 
     .holdCircle {
-      width: 92px;
-      height: 92px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
-      margin: 20px auto 0;
+      margin: 10px auto 0;
       display: none;
       align-items: center;
       justify-content: center;
-      border: 8px solid rgba(255,255,255,0.25);
+      border: 6px solid rgba(255,255,255,0.25);
       background: conic-gradient(#ffe86a var(--p), rgba(255,255,255,0.22) 0);
-      box-shadow: 0 0 25px rgba(255,232,106,0.55);
-      font-size: 24px;
+      box-shadow: 0 0 20px rgba(255,232,106,0.5);
+      font-size: 16px;
       font-weight: 900;
     }
 
@@ -444,35 +462,60 @@
       }
 
       .choice {
-        height: 18vh;
-        border-radius: 24px;
+        height: 15vh;
+        border-radius: 22px;
         flex-direction: row;
-        gap: 18px;
+        gap: 14px;
       }
 
       .choiceIcon {
         margin-bottom: 0;
-        font-size: 54px;
+        font-size: 44px;
+      }
+
+      .choiceLabel {
+        font-size: clamp(22px, 7vw, 34px);
       }
 
       .questionPanel {
         order: -1;
+        width: min(92vw, 620px);
+        margin-top: 0;
       }
 
       .animalName {
-        font-size: clamp(40px, 12vw, 72px);
+        font-size: clamp(34px, 10vw, 62px);
       }
 
       .questionText {
-        font-size: clamp(22px, 6vw, 34px);
+        font-size: clamp(18px, 5vw, 29px);
       }
 
       .topbar {
         grid-template-columns: 1fr;
       }
 
+      .titleBox {
+        width: 100%;
+      }
+
       .pill {
         display: inline-block;
+      }
+    }
+
+    /* Layout v3: เปิดพื้นที่กลางจอให้เห็นหน้านักเรียนมากขึ้น */
+    @media (orientation: landscape) {
+      .topbar {
+        grid-template-columns: minmax(260px, 48vw) auto auto;
+      }
+
+      .main {
+        grid-template-columns: 22% 56% 22%;
+      }
+
+      .questionPanel {
+        transform: translateY(-4px);
       }
     }
   </style>
@@ -497,7 +540,8 @@
   <div class="main">
     <div id="leftChoice" class="choice left">
       <div class="choiceIcon">🖐️</div>
-      <div class="choiceLabel" id="leftText">มีกระดูกสันหลัง</div>
+      <div class="choiceLabel" id="leftText">มีกระดูก
+สันหลัง</div>
       <div class="choiceHint">เอามือเข้ากรอบซ้าย</div>
     </div>
 
@@ -514,7 +558,8 @@
 
     <div id="rightChoice" class="choice right">
       <div class="choiceIcon">🖐️</div>
-      <div class="choiceLabel" id="rightText">ไม่มีกระดูกสันหลัง</div>
+      <div class="choiceLabel" id="rightText">ไม่มีกระดูก
+สันหลัง</div>
       <div class="choiceHint">เอามือเข้ากรอบขวา</div>
     </div>
   </div>
@@ -529,7 +574,7 @@
     <div class="card">
       <h1 id="startTitle">เกม AR จำแนกสัตว์</h1>
       <p id="startTopic">เรื่อง การจำแนกสัตว์มีกระดูกสันหลัง</p>
-      <p>ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมเสียงเอฟเฟกต์และดนตรีเบา ๆ</p>
+      <p>ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ</p>
       <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)">
       <button id="startBtn" type="button" class="startBtn">เริ่มเกม</button>
       <p style="font-size:16px; opacity:.75;">
@@ -624,6 +669,18 @@
       return Number.isFinite(n) && n > 0 ? n : defaultValue;
     }
 
+    function formatChoiceLabel(text) {
+      const value = String(text || '').trim();
+      if (value === 'มีกระดูกสันหลัง') return 'มีกระดูก\nสันหลัง';
+      if (value === 'ไม่มีกระดูกสันหลัง') return 'ไม่มีกระดูก\nสันหลัง';
+      return value;
+    }
+
+    function setChoiceLabels(left, right) {
+      document.getElementById('leftText').textContent = formatChoiceLabel(left || 'มีกระดูกสันหลัง');
+      document.getElementById('rightText').textContent = formatChoiceLabel(right || 'ไม่มีกระดูกสันหลัง');
+    }
+
     function initAudio() {
       if (!soundEnabled) return;
 
@@ -636,7 +693,7 @@
 
         audioCtx = new AudioContextClass();
         masterGain = audioCtx.createGain();
-        masterGain.gain.value = 0.75;
+        masterGain.gain.value = 0.85;
         masterGain.connect(audioCtx.destination);
       }
     }
@@ -671,6 +728,27 @@
       osc.stop(now + duration + 0.04);
     }
 
+    function sweepTone(startFreq, endFreq, duration, type, volume, delay) {
+      if (!soundEnabled || !audioCtx || !masterGain) return;
+
+      const now = audioCtx.currentTime + (delay || 0);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), now + duration);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume || 0.10), now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + duration + 0.04);
+    }
+
     function noiseBurst(duration, volume, delay) {
       if (!soundEnabled || !audioCtx || !masterGain) return;
 
@@ -695,9 +773,11 @@
     }
 
     function playStartSound() {
-      tone(392, 0.10, 'triangle', 0.12, 0);
-      tone(523.25, 0.12, 'triangle', 0.13, 0.10);
-      tone(659.25, 0.16, 'triangle', 0.13, 0.22);
+      noiseBurst(0.07, 0.05, 0.00);
+      sweepTone(180, 70, 0.12, 'sine', 0.12, 0.00);
+      tone(523.25, 0.08, 'square', 0.11, 0.08);
+      tone(659.25, 0.08, 'square', 0.11, 0.17);
+      tone(783.99, 0.12, 'sawtooth', 0.10, 0.26);
     }
 
     function playCorrectSound() {
@@ -727,18 +807,30 @@
     function startBackgroundMusic() {
       if (!soundEnabled || !audioCtx || musicTimer) return;
 
+      // ซาวด์เกมแบบเร้าใจ: เบส + กลองสั้น ๆ + อาร์เปจจิโอ synth
       function loop() {
         if (!soundEnabled || !audioCtx) return;
-        tone(261.63, 0.18, 'sine', 0.035, 0.00);
-        tone(329.63, 0.18, 'sine', 0.030, 0.45);
-        tone(392.00, 0.18, 'sine', 0.030, 0.90);
-        tone(523.25, 0.20, 'sine', 0.028, 1.35);
-        tone(392.00, 0.18, 'sine', 0.026, 1.90);
-        tone(329.63, 0.18, 'sine', 0.026, 2.35);
+
+        const beat = 0.43;
+        const bass = [130.81, 130.81, 164.81, 196.00, 130.81, 164.81, 196.00, 246.94];
+        const lead = [523.25, 659.25, 783.99, 659.25, 587.33, 739.99, 880.00, 739.99];
+
+        for (let i = 0; i < 8; i++) {
+          const t = i * beat;
+
+          if (i % 2 === 0) {
+            sweepTone(150, 58, 0.12, 'sine', 0.105, t);
+          }
+
+          noiseBurst(0.035, 0.030, t + 0.20);
+          tone(bass[i], 0.16, 'square', 0.045, t + 0.02);
+          tone(lead[i], 0.10, 'sawtooth', 0.026, t + 0.06);
+          tone(lead[i] * 1.5, 0.06, 'triangle', 0.014, t + 0.22);
+        }
       }
 
       loop();
-      musicTimer = setInterval(loop, 3200);
+      musicTimer = setInterval(loop, 3440);
     }
 
     function stopBackgroundMusic() {
@@ -760,7 +852,7 @@
         return;
       }
 
-      if (masterGain) masterGain.gain.value = 0.75;
+      if (masterGain) masterGain.gain.value = 0.85;
       btn.textContent = 'เสียง: เปิด';
       await unlockAudio();
       playStartSound();
@@ -934,8 +1026,7 @@
       const leftDefault = config.leftDefault || 'มีกระดูกสันหลัง';
       const rightDefault = config.rightDefault || 'ไม่มีกระดูกสันหลัง';
 
-      document.getElementById('leftText').textContent = leftDefault;
-      document.getElementById('rightText').textContent = rightDefault;
+      setChoiceLabels(leftDefault, rightDefault);
     }
 
     async function setupCameraAndHands() {
@@ -1131,8 +1222,7 @@
       document.getElementById('questionNo').textContent = 'ข้อ ' + (currentIndex + 1) + ' / ' + total;
       document.getElementById('animalName').textContent = q.animal || 'สัตว์';
       document.getElementById('questionText').textContent = q.question || '';
-      document.getElementById('leftText').textContent = q.leftText || config.leftDefault || 'มีกระดูกสันหลัง';
-      document.getElementById('rightText').textContent = q.rightText || config.rightDefault || 'ไม่มีกระดูกสันหลัง';
+      setChoiceLabels(q.leftText || config.leftDefault || 'มีกระดูกสันหลัง', q.rightText || config.rightDefault || 'ไม่มีกระดูกสันหลัง');
 
       document.getElementById('scoreBox').textContent = 'คะแนน ' + score;
       document.getElementById('explainBox').style.display = 'none';
