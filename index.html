@@ -256,13 +256,8 @@
     }
 
     .explainBox {
-      margin-top: 10px;
-      padding: 10px 13px;
-      border-radius: 18px;
-      background: rgba(255,255,255,0.12);
-      font-size: clamp(14px, 1.45vw, 20px);
-      line-height: 1.28;
-      display: none;
+      /* ปิดกล่องคำอธิบายคำตอบ เพื่อไม่กินพื้นที่กลางจอ */
+      display: none !important;
     }
 
     .timerWrap {
@@ -281,18 +276,53 @@
     }
 
     .holdCircle {
-      width: 64px;
-      height: 64px;
+      width: clamp(92px, 10vw, 132px);
+      height: clamp(92px, 10vw, 132px);
       border-radius: 50%;
-      margin: 10px auto 0;
+      margin: 14px auto 0;
       display: none;
       align-items: center;
       justify-content: center;
-      border: 6px solid rgba(255,255,255,0.25);
-      background: conic-gradient(#ffe86a var(--p), rgba(255,255,255,0.22) 0);
-      box-shadow: 0 0 20px rgba(255,232,106,0.5);
-      font-size: 16px;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+      border: 0;
+      background:
+        conic-gradient(#ffe86a var(--p), rgba(255,255,255,0.20) 0);
+      box-shadow:
+        0 0 0 6px rgba(255,255,255,0.20),
+        0 0 34px rgba(255,232,106,0.88),
+        0 10px 30px rgba(0,0,0,0.35);
+      color: #2a1800;
       font-weight: 900;
+      overflow: hidden;
+    }
+
+    .holdCircle::before {
+      content: '';
+      position: absolute;
+      inset: 13px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.92);
+      box-shadow: inset 0 0 18px rgba(255,193,7,0.28);
+    }
+
+    .holdPercent {
+      position: relative;
+      z-index: 1;
+      font-size: clamp(24px, 3vw, 38px);
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .holdText {
+      position: relative;
+      z-index: 1;
+      margin-top: 4px;
+      font-size: clamp(12px, 1.35vw, 17px);
+      line-height: 1;
+      font-weight: 900;
+      color: #5b3900;
     }
 
     .bottombar {
@@ -503,6 +533,11 @@
         font-size: clamp(18px, 5vw, 29px);
       }
 
+      .holdCircle {
+        width: clamp(82px, 22vw, 112px);
+        height: clamp(82px, 22vw, 112px);
+      }
+
       .topbar {
         grid-template-columns: 1fr;
       }
@@ -566,7 +601,10 @@
       <div class="timerWrap">
         <div id="timerBar" class="timerBar"></div>
       </div>
-      <div id="holdCircle" class="holdCircle" style="--p:0%">0%</div>
+      <div id="holdCircle" class="holdCircle" style="--p:0%">
+        <span id="holdPercent" class="holdPercent">0%</span>
+        <span class="holdText">ค้างไว้</span>
+      </div>
     </div>
 
     <div id="rightChoice" class="choice right">
@@ -626,6 +664,7 @@
     const rightChoice = document.getElementById('rightChoice');
     const handDot = document.getElementById('handDot');
     const holdCircle = document.getElementById('holdCircle');
+    const holdPercent = document.getElementById('holdPercent');
     const debugBox = document.getElementById('debugBox');
 
     let config = {};
@@ -1322,7 +1361,7 @@
 
       holdCircle.style.display = 'flex';
       holdCircle.style.setProperty('--p', percent + '%');
-      holdCircle.textContent = percent + '%';
+      if (holdPercent) holdPercent.textContent = percent + '%';
 
       if (elapsed >= holdMs) {
         submitAnswer(side);
@@ -1449,7 +1488,7 @@
         } else {
           loadQuestion();
         }
-      }, 1800);
+      }, 1200);
     }
 
     function showAnswerResult(selectedSide, correctSide, isCorrect, q) {
@@ -1464,13 +1503,10 @@
         if (selectedSide === 'right') rightChoice.classList.add('wrong');
       }
 
+      // ไม่แสดงคำอธิบายหลังตอบ เพื่อไม่ให้กินพื้นที่กลางจอ
       const explainBox = document.getElementById('explainBox');
-      const showExplanation = normalizeBool(config.showExplanation, true);
-
-      if (showExplanation && q.explanation) {
-        explainBox.textContent = q.explanation;
-        explainBox.style.display = 'block';
-      }
+      explainBox.textContent = '';
+      explainBox.style.display = 'none';
 
       if (selectedSide === 'timeout') {
         setStatus('หมดเวลา!');
