@@ -623,19 +623,19 @@
 
   <div id="startScreen" class="startScreen">
     <div class="card">
-      <h1 id="startTitle">เกม AR จำแนกสัตว์</h1>
+      <h1 id="startTitle">กำลังโหลดข้อมูลจากชีต...</h1>
       <p id="startTopic" class="startText" style="display:none;"></p>
-      <p id="startInstruction" class="startText">ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ</p>
-      <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)">
-      <button id="startBtn" type="button" class="startBtn">เริ่มเกม</button>
-      <p id="startNote" class="startNote" style="font-size:16px; opacity:.75;">แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages</p>
+      <p id="startInstruction" class="startText" style="display:none;"></p>
+      <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)" style="display:none;">
+      <button id="startBtn" type="button" class="startBtn" style="display:none;">เริ่มเกม</button>
+      <p id="startNote" class="startNote" style="font-size:16px; opacity:.75; display:none;"></p>
     </div>
   </div>
 
   <div id="loadingScreen" class="loadingScreen">
     <div class="card">
       <div class="spinner"></div>
-      <h1>กำลังเตรียมเกม</h1>
+      <h1 id="loadingTitle">กำลังเตรียมเกม</h1>
       <p id="loadingText">กำลังเริ่มระบบ...</p>
     </div>
   </div>
@@ -683,6 +683,7 @@
     let isGameRunning = false;
     let isStarting = false;
     let lastFrameAt = 0;
+    let gameDataLoadedAt = 0;
 
     // เสียงและดนตรี: ใช้ Web Audio API สร้างเสียงในตัว ไม่ต้องมีไฟล์เสียงแยก
     let soundEnabled = true;
@@ -701,7 +702,17 @@
     }
 
     function showLoading(text) {
-      document.getElementById('loadingText').textContent = text || 'กำลังโหลด...';
+      const loadingTitleEl = document.getElementById('loadingTitle');
+      const loadingTextEl = document.getElementById('loadingText');
+
+      if (loadingTitleEl) {
+        loadingTitleEl.textContent = configText('loadingTitle', 'กำลังเตรียมเกม') || 'กำลังเตรียมเกม';
+      }
+
+      if (loadingTextEl) {
+        loadingTextEl.textContent = text || configText('loadingDefaultText', 'กำลังโหลด...');
+      }
+
       document.getElementById('loadingScreen').style.display = 'flex';
     }
 
@@ -994,17 +1005,43 @@
 
 
     async function preloadGameData() {
-      // ซ่อนข้อความหน้าแรกที่ผูกกับ Config ไว้ก่อน กันข้อความเดิมโผล่ก่อนโหลดค่าจากชีต
-      setTextOrHide('startTopic', '');
+      // หน้าแรกต้องอิง Config จากชีตก่อนเสมอ ไม่ใช้ข้อความ hardcode เดิม
+      const startScreen = document.getElementById('startScreen');
+
       try {
+        startScreen.classList.add('hide');
+        showLoading('กำลังโหลดข้อมูลจากชีต...');
         setStatus('กำลังโหลดการตั้งค่าจากชีต...');
-        await loadGameData();
-        setStatus('หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม');
-        debugLog('โหลดการตั้งค่าหน้าแรกจาก Config สำเร็จ');
+
+        await loadConfigOnly();
+
+        hideLoading();
+        startScreen.classList.remove('hide');
+        setStatus(configValue('readyStatusText', 'หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม'));
+        debugLog('โหลด Config หน้าแรกจากชีตสำเร็จ');
       } catch (err) {
-        debugLog('โหลดการตั้งค่าหน้าแรกไม่ได้: ' + (err && err.message ? err.message : err));
-        setStatus('หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม');
+        debugLog('โหลด Config หน้าแรกไม่ได้: ' + (err && err.message ? err.message : err));
+
+        hideLoading();
+        startScreen.classList.remove('hide');
+
+        // ถ้า API ล้มเหลว ให้โชว์หน้าเริ่มเกมแบบ fallback แต่ยังให้กรอกชื่อได้
+        config = {};
+        applyConfigToUI();
+        setStatus('โหลด Config จากชีตไม่ได้ แต่ยังเปิดหน้าเริ่มเกมได้');
       }
+    }
+
+    async function loadConfigOnly() {
+      const data = await gasJsonp({
+        action: 'getConfig',
+        set: GAME_SET
+      });
+
+      debugLog('โหลด Config จาก Apps Script API สำเร็จ');
+
+      config = data && data.config ? data.config : {};
+      applyConfigToUI();
     }
 
     async function startGame() {
@@ -1027,19 +1064,16 @@
         document.getElementById('startScreen').classList.add('hide');
         document.getElementById('endScreen').classList.add('hide');
 
-        showLoading('กำลังเปิดกล้อง...');
+        showLoading(configText('loadingCameraText', 'กำลังเปิดกล้อง...'));
         debugLog('กำลังเปิดกล้องจาก GitHub Pages');
 
         await setupCameraAndHands();
 
-        showLoading('กำลังโหลดคำถามจากชีต...');
+        showLoading(configText('loadingQuestionText', 'กำลังโหลดคำถามจากชีต...'));
         debugLog('กล้องพร้อมแล้ว กำลังโหลดคำถามจาก Apps Script API');
 
-        if (!questions.length) {
-          await loadGameData();
-        } else {
-          applyConfigToUI();
-        }
+        // โหลดจากชีตใหม่ทุกครั้งก่อนเริ่มเกม ไม่ใช้คำถาม/Config ที่ค้างจากรอบก่อน
+        await loadGameData();
 
         currentIndex = 0;
         score = 0;
@@ -1049,7 +1083,7 @@
 
         hideLoading();
         loadQuestion();
-        setStatus('ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้');
+        setStatus(configValue('playingStatusText', 'ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้'));
         debugLog('เริ่มเกมสำเร็จ มีคำถาม ' + questions.length + ' ข้อ');
 
       } catch (err) {
@@ -1074,6 +1108,7 @@
 
       config = data && data.config ? data.config : {};
       questions = data && data.questions ? data.questions : [];
+      gameDataLoadedAt = Date.now();
 
       if (!questions.length) {
         throw new Error('ไม่พบคำถามในชีต Questions หรือ set ไม่ตรง');
@@ -1142,11 +1177,23 @@
       }
 
       const playerNameInput = document.getElementById('playerName');
-      playerNameInput.placeholder = configValue('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)');
-      playerNameInput.style.display = isConfigActive('playerNamePlaceholder') ? '' : 'none';
+      const showPlayerNameInput = isConfigActive('showPlayerNameInput') &&
+        normalizeBool(configValue('showPlayerNameInput', 'TRUE'), true);
+
+      playerNameInput.placeholder = isConfigActive('playerNamePlaceholder')
+        ? configValue('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)')
+        : 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)';
+      playerNameInput.style.display = showPlayerNameInput ? '' : 'none';
+
+      const loadingTitleEl = document.getElementById('loadingTitle');
+      if (loadingTitleEl) {
+        loadingTitleEl.textContent = configText('loadingTitle', 'กำลังเตรียมเกม') || 'กำลังเตรียมเกม';
+      }
 
       // ปุ่มเริ่มเกมไม่ซ่อนตาม active เพื่อกันกรณีติ๊กออกแล้วเริ่มเกมไม่ได้
-      document.getElementById('startBtn').textContent = configValue('startButtonText', 'เริ่มเกม');
+      const startBtnEl = document.getElementById('startBtn');
+      startBtnEl.textContent = configValue('startButtonText', 'เริ่มเกม');
+      startBtnEl.style.display = '';
 
       const leftDefault = configValue('leftDefault', 'มีกระดูกสันหลัง');
       const rightDefault = configValue('rightDefault', 'ไม่มีกระดูกสันหลัง');
@@ -1423,7 +1470,7 @@
       questionStartedAt = Date.now();
 
       startTimerForQuestion(q);
-      setStatus('ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้');
+      setStatus(configValue('playingStatusText', 'ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้'));
     }
 
     function startTimerForQuestion(q) {
