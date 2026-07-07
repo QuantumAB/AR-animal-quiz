@@ -1177,12 +1177,15 @@
       }
 
       const playerNameInput = document.getElementById('playerName');
-      const showPlayerNameInput = isConfigActive('showPlayerNameInput') &&
+
+      // ช่องกรอกชื่อผูกกับ active ของ playerNamePlaceholder โดยตรง
+      // ถ้าไม่ติ๊ก playerNamePlaceholder ในชีต Config = ซ่อนช่องกรอกชื่อทั้งช่อง
+      // showPlayerNameInput เป็นตัวเลือกเสริมเท่านั้น เผื่อชีตเก่ามีแถวนี้อยู่
+      const showPlayerNameInput = isConfigActive('playerNamePlaceholder') &&
+        isConfigActive('showPlayerNameInput') &&
         normalizeBool(configValue('showPlayerNameInput', 'TRUE'), true);
 
-      playerNameInput.placeholder = isConfigActive('playerNamePlaceholder')
-        ? configValue('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)')
-        : 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)';
+      playerNameInput.placeholder = configValue('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)');
       playerNameInput.style.display = showPlayerNameInput ? '' : 'none';
 
       const loadingTitleEl = document.getElementById('loadingTitle');
