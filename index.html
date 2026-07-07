@@ -1041,35 +1041,74 @@
       applyConfigToUI();
     }
 
-    function configText(key, fallback) {
+    function isConfigActive(key) {
+      if (!config || !config._active || config._active[key] === undefined) return true;
+
+      const value = config._active[key];
+      if (value === false) return false;
+
+      const text = String(value || '').trim().toUpperCase();
+      if (text === 'FALSE' || text === 'NO' || text === '0' || text === 'ปิด' || text === 'ไม่ใช้') return false;
+
+      return true;
+    }
+
+    function configValue(key, fallback) {
       if (!config || config[key] === undefined || config[key] === null) return fallback;
 
       const value = String(config[key]);
       return value.trim() ? value : fallback;
     }
 
+    function configText(key, fallback) {
+      if (!isConfigActive(key)) return '';
+      return configValue(key, fallback);
+    }
+
+    function setTextOrHide(id, text) {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const value = String(text || '').trim();
+      el.textContent = value;
+      el.style.display = value ? '' : 'none';
+    }
+
     function applyConfigToUI() {
+      const gameTitleValue = configValue('gameTitle', 'เกม AR จำแนกสัตว์');
+      const topicValue = configValue('topic', 'การจำแนกสัตว์มีกระดูกสันหลัง');
+
       const gameTitle = configText('gameTitle', 'เกม AR จำแนกสัตว์');
       const topic = configText('topic', 'การจำแนกสัตว์มีกระดูกสันหลัง');
 
-      document.title = gameTitle;
-      document.getElementById('gameTitle').textContent = gameTitle;
-      document.getElementById('topic').textContent = topic;
-      document.getElementById('startTitle').textContent = gameTitle;
-      document.getElementById('startTopic').textContent = configText('startTopicText', 'เรื่อง ' + topic);
-      document.getElementById('startInstruction').textContent = configText(
+      document.title = gameTitleValue;
+      setTextOrHide('gameTitle', gameTitle);
+      setTextOrHide('topic', topic);
+      setTextOrHide('startTitle', gameTitle);
+      setTextOrHide('startTopic', configText('startTopicText', 'เรื่อง ' + topicValue));
+      setTextOrHide(
         'startInstruction',
-        'ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ'
+        configText('startInstruction', 'ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ')
       );
-      document.getElementById('playerName').placeholder = configText('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)');
-      document.getElementById('startBtn').textContent = configText('startButtonText', 'เริ่มเกม');
-      document.getElementById('startNote').textContent = configText(
+      setTextOrHide(
         'startNote',
-        'แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages'
+        configText('startNote', 'แนะนำให้ใช้ iPad แนวนอน และเปิดผ่านลิงก์ GitHub Pages')
       );
 
-      const leftDefault = configText('leftDefault', 'มีกระดูกสันหลัง');
-      const rightDefault = configText('rightDefault', 'ไม่มีกระดูกสันหลัง');
+      const titleBox = document.querySelector('.titleBox');
+      if (titleBox) {
+        titleBox.style.display = (gameTitle || topic) ? '' : 'none';
+      }
+
+      const playerNameInput = document.getElementById('playerName');
+      playerNameInput.placeholder = configValue('playerNamePlaceholder', 'ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)');
+      playerNameInput.style.display = isConfigActive('playerNamePlaceholder') ? '' : 'none';
+
+      // ปุ่มเริ่มเกมไม่ซ่อนตาม active เพื่อกันกรณีติ๊กออกแล้วเริ่มเกมไม่ได้
+      document.getElementById('startBtn').textContent = configValue('startButtonText', 'เริ่มเกม');
+
+      const leftDefault = configValue('leftDefault', 'มีกระดูกสันหลัง');
+      const rightDefault = configValue('rightDefault', 'ไม่มีกระดูกสันหลัง');
 
       setChoiceLabels(leftDefault, rightDefault);
     }
@@ -1325,7 +1364,7 @@
       document.getElementById('animalName').textContent = q.animal || 'สัตว์';
 
       const questionTextEl = document.getElementById('questionText');
-      if (normalizeBool(config.showQuestionText, false) && q.question) {
+      if (isConfigActive('showQuestionText') && normalizeBool(config.showQuestionText, false) && q.question) {
         questionTextEl.textContent = q.question;
         questionTextEl.style.display = 'block';
       } else {
