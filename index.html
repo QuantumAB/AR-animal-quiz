@@ -669,6 +669,8 @@
 
     let config = {};
     let questions = [];
+    let cachedQuestions = [];
+    let preloadPromise = null;
     let currentIndex = 0;
     let score = 0;
     let locked = false;
@@ -677,6 +679,7 @@
     let questionStartedAt = 0;
     let gameStartedAt = 0;
     let timerInterval = null;
+    let nextQuestionTimeout = null;
     let camera = null;
     let hands = null;
     let isCameraReady = false;
@@ -1005,43 +1008,94 @@
 
 
     async function preloadGameData() {
-      // หน้าแรกต้องอิง Config จากชีตก่อนเสมอ ไม่ใช้ข้อความ hardcode เดิม
+      // โหลด Config + Questions ให้ครบตั้งแต่หน้าแรกครั้งเดียว
+      // หลังจากนี้ กดเริ่มเกม/เล่นใหม่ จะใช้ cachedQuestions ในหน้าเว็บ ไม่ยิง Apps Script ซ้ำ
       const startScreen = document.getElementById('startScreen');
 
-      try {
-        startScreen.classList.add('hide');
-        showLoading('กำลังโหลดข้อมูลจากชีต...');
-        setStatus('กำลังโหลดการตั้งค่าจากชีต...');
+      preloadPromise = (async function() {
+        try {
+          startScreen.classList.add('hide');
+          showLoading(configText('loadingConfigText', 'กำลังโหลดข้อมูลจากชีต...'));
+          setStatus('กำลังโหลดข้อมูลจากชีต...');
 
-        await loadConfigOnly();
+          await loadGameData();
 
+          hideLoading();
+          startScreen.classList.remove('hide');
+          setStatus(configValue('readyStatusText', 'หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม'));
+          debugLog('โหลด Config + Questions จากชีตสำเร็จ และเก็บไว้ในหน่วยความจำแล้ว');
+        } catch (err) {
+          debugLog('โหลดข้อมูลหน้าแรกไม่ได้: ' + (err && err.message ? err.message : err));
+
+          hideLoading();
+          startScreen.classList.remove('hide');
+
+          config = {};
+          questions = [];
+          cachedQuestions = [];
+          applyConfigToUI();
+          setStatus('โหลดข้อมูลจากชีตไม่ได้ กรุณาตรวจ GAS_URL / Deploy / ชีต Questions');
+        }
+      })();
+
+      return preloadPromise;
+    }
+
+    async function ensureGameDataReady() {
+      if (cachedQuestions.length) {
+        return;
+      }
+
+      if (preloadPromise) {
+        await preloadPromise;
+      }
+
+      if (!cachedQuestions.length) {
+        showLoading(configText('loadingConfigText', 'กำลังโหลดข้อมูลจากชีต...'));
+        await loadGameData();
         hideLoading();
-        startScreen.classList.remove('hide');
-        setStatus(configValue('readyStatusText', 'หน้าเกมพร้อมแล้ว กดปุ่มเริ่มเกม'));
-        debugLog('โหลด Config หน้าแรกจากชีตสำเร็จ');
-      } catch (err) {
-        debugLog('โหลด Config หน้าแรกไม่ได้: ' + (err && err.message ? err.message : err));
-
-        hideLoading();
-        startScreen.classList.remove('hide');
-
-        // ถ้า API ล้มเหลว ให้โชว์หน้าเริ่มเกมแบบ fallback แต่ยังให้กรอกชื่อได้
-        config = {};
-        applyConfigToUI();
-        setStatus('โหลด Config จากชีตไม่ได้ แต่ยังเปิดหน้าเริ่มเกมได้');
       }
     }
 
-    async function loadConfigOnly() {
-      const data = await gasJsonp({
-        action: 'getConfig',
-        set: GAME_SET
-      });
+    function shuffleArrayClient(list) {
+      const arr = list.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+      }
+      return arr;
+    }
 
-      debugLog('โหลด Config จาก Apps Script API สำเร็จ');
+    function prepareQuestionsForRound() {
+      let roundQuestions = cachedQuestions.slice();
+      const randomOrder = String(configValue('randomOrder', 'TRUE')).toUpperCase() === 'TRUE';
 
-      config = data && data.config ? data.config : {};
-      applyConfigToUI();
+      if (randomOrder) {
+        roundQuestions = shuffleArrayClient(roundQuestions);
+      }
+
+      questions = roundQuestions;
+    }
+
+    function clearRoundRuntime() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+
+      if (nextQuestionTimeout) {
+        clearTimeout(nextQuestionTimeout);
+        nextQuestionTimeout = null;
+      }
+
+      locked = false;
+      currentHoverSide = null;
+      holdStart = null;
+      clearHover();
+      holdCircle.style.display = 'none';
+      leftChoice.classList.remove('hover', 'correct', 'wrong');
+      rightChoice.classList.remove('hover', 'correct', 'wrong');
+      document.getElementById('timerBar').style.width = '100%';
     }
 
     async function startGame() {
@@ -1054,26 +1108,32 @@
 
       try {
         setStatus('กำลังเริ่มเกม...');
-        debugLog('เริ่ม startGame');
+        debugLog('เริ่ม startGame โดยใช้ข้อมูลที่โหลดไว้แล้ว');
+
+        document.getElementById('startScreen').classList.add('hide');
+        document.getElementById('endScreen').classList.add('hide');
+
+        // ถ้าหน้าเว็บยังโหลดข้อมูลครั้งแรกไม่เสร็จ ให้รอรอบแรกเท่านั้น
+        // รอบถัดไปจะไม่เรียก Apps Script ซ้ำแล้ว
+        await ensureGameDataReady();
+
+        if (!cachedQuestions.length) {
+          throw new Error('ยังไม่มีคำถามที่โหลดไว้จากชีต');
+        }
+
+        applyConfigToUI();
+        prepareQuestionsForRound();
+        clearRoundRuntime();
 
         // iPad/Safari ต้องเริ่มเสียงจากการแตะของผู้ใช้โดยตรง
         await unlockAudio();
         playStartSound();
         startBackgroundMusic();
 
-        document.getElementById('startScreen').classList.add('hide');
-        document.getElementById('endScreen').classList.add('hide');
-
         showLoading(configText('loadingCameraText', 'กำลังเปิดกล้อง...'));
         debugLog('กำลังเปิดกล้องจาก GitHub Pages');
 
         await setupCameraAndHands();
-
-        showLoading(configText('loadingQuestionText', 'กำลังโหลดคำถามจากชีต...'));
-        debugLog('กล้องพร้อมแล้ว กำลังโหลดคำถามจาก Apps Script API');
-
-        // โหลดจากชีตใหม่ทุกครั้งก่อนเริ่มเกม ไม่ใช้คำถาม/Config ที่ค้างจากรอบก่อน
-        await loadGameData();
 
         currentIndex = 0;
         score = 0;
@@ -1084,7 +1144,7 @@
         hideLoading();
         loadQuestion();
         setStatus(configValue('playingStatusText', 'ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้'));
-        debugLog('เริ่มเกมสำเร็จ มีคำถาม ' + questions.length + ' ข้อ');
+        debugLog('เริ่มเกมสำเร็จ มีคำถาม ' + questions.length + ' ข้อ จาก cache ไม่ได้โหลดชีตซ้ำ');
 
       } catch (err) {
         console.error(err);
@@ -1107,10 +1167,11 @@
       debugLog('โหลดข้อมูลจาก Apps Script API สำเร็จ');
 
       config = data && data.config ? data.config : {};
-      questions = data && data.questions ? data.questions : [];
+      cachedQuestions = data && data.questions ? data.questions.slice() : [];
+      questions = cachedQuestions.slice();
       gameDataLoadedAt = Date.now();
 
-      if (!questions.length) {
+      if (!cachedQuestions.length) {
         throw new Error('ไม่พบคำถามในชีต Questions หรือ set ไม่ตรง');
       }
 
@@ -1530,7 +1591,8 @@
       showAnswerResult(side, correctSide, isCorrect, q);
       document.getElementById('scoreBox').textContent = 'คะแนน ' + score;
 
-      setTimeout(function() {
+      nextQuestionTimeout = setTimeout(function() {
+        nextQuestionTimeout = null;
         currentIndex++;
 
         if (currentIndex >= questions.length) {
@@ -1604,7 +1666,15 @@
     }
 
     function restartGame() {
-      location.reload();
+      // เล่นใหม่ในหน้าเดิม ไม่ reload หน้าเว็บ และไม่โหลดข้อมูลจากชีตซ้ำ
+      if (isStarting) return;
+
+      isGameRunning = false;
+      clearRoundRuntime();
+      document.getElementById('endScreen').classList.add('hide');
+      document.getElementById('startScreen').classList.add('hide');
+
+      startGame();
     }
 
     function resizeCanvas() {
