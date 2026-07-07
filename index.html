@@ -586,7 +586,7 @@
   <div id="startScreen" class="startScreen">
     <div class="card">
       <h1 id="startTitle">เกม AR จำแนกสัตว์</h1>
-      <p id="startTopic" class="startText">เรื่อง การจำแนกสัตว์มีกระดูกสันหลัง</p>
+      <p id="startTopic" class="startText" style="display:none;"></p>
       <p id="startInstruction" class="startText">ขยับมือไปที่กรอบคำตอบซ้าย/ขวา แล้วค้างไว้เพื่อเลือกคำตอบ พร้อมซาวด์มันส์ ๆ</p>
       <input id="playerName" class="nameInput" placeholder="ชื่อผู้เล่น / ห้องเรียน (ไม่ใส่ก็ได้)">
       <button id="startBtn" type="button" class="startBtn">เริ่มเกม</button>
@@ -955,6 +955,8 @@
 
 
     async function preloadGameData() {
+      // ซ่อนข้อความหน้าแรกที่ผูกกับ Config ไว้ก่อน กันข้อความเดิมโผล่ก่อนโหลดค่าจากชีต
+      setTextOrHide('startTopic', '');
       try {
         setStatus('กำลังโหลดการตั้งค่าจากชีต...');
         await loadGameData();
