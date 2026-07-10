@@ -670,6 +670,8 @@
     let config = {};
     let questions = [];
     let cachedQuestions = [];
+    let usedQuestionKeys = new Set();
+    let questionCycleNo = 1;
     let preloadPromise = null;
     let currentIndex = 0;
     let score = 0;
@@ -1068,15 +1070,87 @@
       return arr;
     }
 
-    function prepareQuestionsForRound() {
-      let roundQuestions = cachedQuestions.slice();
-      const randomOrder = String(configValue('randomOrder', 'TRUE')).toUpperCase() === 'TRUE';
+    function buildQuestionKey(q, index) {
+      // ใช้รหัสจากชีตถ้ามี เพื่อจำว่าเคยสุ่มข้อไหนไปแล้ว
+      // ถ้าไม่มีรหัส ให้สร้าง key จากข้อมูลคำถาม + ลำดับใน cache แทน
+      const directKey = q.id || q.questionId || q.qid || q.code || q.key || q.no || q.row || q.rowNumber;
 
-      if (randomOrder) {
-        roundQuestions = shuffleArrayClient(roundQuestions);
+      if (directKey !== undefined && directKey !== null && String(directKey).trim()) {
+        return String(directKey).trim();
       }
 
-      questions = roundQuestions;
+      return [
+        'cache',
+        index,
+        q.animal || '',
+        q.question || '',
+        q.correct || '',
+        q.leftText || '',
+        q.rightText || ''
+      ].join('¦');
+    }
+
+    function getRoundQuestionCount() {
+      // รอบหนึ่งให้เล่นกี่ข้อ: ตั้งค่าใน Config ได้หลายชื่อ เผื่อชีตเดิมใช้ชื่อไม่เหมือนกัน
+      // ถ้าไม่มีค่าใด ๆ ให้ใช้ 10 ข้อตามที่ต้องการ
+      const rawValue = config.roundQuestionCount ||
+        config.questionsPerRound ||
+        config.questionPerRound ||
+        config.questionLimit ||
+        config.questionCount ||
+        10;
+
+      const n = Number(rawValue);
+      const fallback = 10;
+      const value = Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+
+      return Math.max(1, Math.min(value, cachedQuestions.length || value));
+    }
+
+    function resetQuestionCycle() {
+      usedQuestionKeys = new Set();
+      questionCycleNo++;
+    }
+
+    function prepareQuestionsForRound() {
+      const randomOrder = String(configValue('randomOrder', 'TRUE')).toUpperCase() === 'TRUE';
+      const roundLimit = getRoundQuestionCount();
+
+      if (!cachedQuestions.length) {
+        questions = [];
+        return;
+      }
+
+      // ถ้า Apps Script ส่งมาแค่ 10 ข้อ หน้าเว็บจะไม่มีทางรู้จักอีก 90 ข้อ
+      // ดังนั้นถ้าอยากกันซ้ำ 10 รอบ ต้องให้ getGameData ส่งคลังคำถามทั้งหมดกลับมา
+      if (cachedQuestions.length <= roundLimit) {
+        questions = randomOrder ? shuffleArrayClient(cachedQuestions).slice(0, roundLimit) : cachedQuestions.slice(0, roundLimit);
+        debugLog('คำถามใน cache มีเพียง ' + cachedQuestions.length + ' ข้อ จึงกันซ้ำข้ามรอบจาก 100 ข้อไม่ได้ ต้องให้ Code.gs ส่งคำถามทั้งหมดกลับมา');
+        return;
+      }
+
+      let availableQuestions = cachedQuestions.filter(q => !usedQuestionKeys.has(q._clientKey));
+
+      // ใช้ครบคลังแล้ว ค่อยเริ่มสุ่มชุดใหม่ตามที่ต้องการ เช่น 100 ข้อ = 10 รอบ รอบละ 10 ข้อ
+      if (availableQuestions.length < roundLimit) {
+        debugLog('ใช้คำถามครบหนึ่งรอบใหญ่แล้ว เริ่มสุ่มคลังใหม่อีกครั้ง');
+        resetQuestionCycle();
+        availableQuestions = cachedQuestions.slice();
+      }
+
+      const selectedQuestions = randomOrder ?
+        shuffleArrayClient(availableQuestions).slice(0, roundLimit) :
+        availableQuestions.slice(0, roundLimit);
+
+      selectedQuestions.forEach(q => usedQuestionKeys.add(q._clientKey));
+      questions = selectedQuestions;
+
+      debugLog(
+        'สุ่มรอบที่ ' + questionCycleNo +
+        ' ได้ ' + questions.length +
+        ' ข้อ จากคลัง ' + cachedQuestions.length +
+        ' ข้อ | ใช้ไปแล้วในรอบใหญ่นี้ ' + usedQuestionKeys.size + ' ข้อ'
+      );
     }
 
     function clearRoundRuntime() {
@@ -1144,7 +1218,7 @@
         hideLoading();
         loadQuestion();
         setStatus(configValue('playingStatusText', 'ขยับมือเข้าไปในกรอบซ้ายหรือขวา แล้วค้างไว้'));
-        debugLog('เริ่มเกมสำเร็จ มีคำถาม ' + questions.length + ' ข้อ จาก cache ไม่ได้โหลดชีตซ้ำ');
+        debugLog('เริ่มเกมสำเร็จ รอบนี้มีคำถาม ' + questions.length + ' ข้อ จากคลังทั้งหมด ' + cachedQuestions.length + ' ข้อ');
 
       } catch (err) {
         console.error(err);
@@ -1161,14 +1235,27 @@
     async function loadGameData() {
       const data = await gasJsonp({
         action: 'getGameData',
-        set: GAME_SET
+        set: GAME_SET,
+        // ขอโหลดคลังคำถามทั้งหมดไว้ก่อน เพื่อให้หน้าเว็บสุ่มรอบละ 10 และกันคำถามซ้ำข้ามรอบ
+        // ถ้า Code.gs รองรับ limit/pool จะได้ส่งคำถามครบจากชีต Questions กลับมา
+        pool: 'all',
+        limit: 1000
       });
 
       debugLog('โหลดข้อมูลจาก Apps Script API สำเร็จ');
 
       config = data && data.config ? data.config : {};
-      cachedQuestions = data && data.questions ? data.questions.slice() : [];
-      questions = cachedQuestions.slice();
+
+      const loadedQuestions = data && Array.isArray(data.questions) ? data.questions : [];
+      cachedQuestions = loadedQuestions.map(function(q, index) {
+        const item = Object.assign({}, q);
+        item._clientKey = buildQuestionKey(item, index);
+        return item;
+      });
+
+      questions = [];
+      usedQuestionKeys = new Set();
+      questionCycleNo = 1;
       gameDataLoadedAt = Date.now();
 
       if (!cachedQuestions.length) {
